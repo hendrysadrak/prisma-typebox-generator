@@ -2,6 +2,7 @@ import { generatorHandler } from '@prisma/generator-helper';
 import { parseEnvValue } from '@prisma/sdk';
 import { error } from 'console';
 import { appendFile, mkdir, writeFile } from 'fs/promises';
+import pMap from 'p-map';
 import * as path from 'path';
 import { format as prettier } from 'prettier';
 import { transformDMMF } from './generator/transformDMMF';
@@ -40,43 +41,32 @@ generatorHandler({
 
     await mkdir(outputDir, { recursive: true });
     await writeFile(barrelFile, '', { encoding: 'utf-8' });
-
-    await Promise.all(
-      payload.map((n) => {
-        const fsPromises = [];
-
-        fsPromises.push(
-          writeFile(path.join(outputDir, n.name + '.ts'), format(n.rawString), {
-            encoding: 'utf-8',
-          }),
+    await pMap(
+      payload,
+      async (n) => {
+        await writeFile(
+          path.join(outputDir, n.name + '.ts'),
+          format(n.rawString),
+          { encoding: 'utf-8' },
         );
 
-        fsPromises.push(
-          appendFile(barrelFile, `export * from './${n.name}';\n`, {
-            encoding: 'utf-8',
-          }),
-        );
+        await appendFile(barrelFile, `export * from './${n.name}';\n`, {
+          encoding: 'utf-8',
+        });
 
         if (n.inputRawString) {
-          fsPromises.push(
-            writeFile(
-              path.join(outputDir, n.name + 'Input.ts'),
-              format(n.inputRawString),
-              {
-                encoding: 'utf-8',
-              },
-            ),
+          await writeFile(
+            path.join(outputDir, n.name + 'Input.ts'),
+            format(n.inputRawString),
+            { encoding: 'utf-8' },
           );
 
-          fsPromises.push(
-            appendFile(barrelFile, `export * from './${n.name}Input';\n`, {
-              encoding: 'utf-8',
-            }),
-          );
+          await appendFile(barrelFile, `export * from './${n.name}Input';\n`, {
+            encoding: 'utf-8',
+          });
         }
-
-        return Promise.all(fsPromises);
-      }),
+      },
+      { concurrency: 1 },
     );
   },
 });
