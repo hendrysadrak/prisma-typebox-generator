@@ -1,5 +1,5 @@
 import type { DMMF } from '@prisma/generator-helper';
-import { log } from 'console';
+import { transformEnums } from './enums';
 
 const transformField = (field: DMMF.Field) => {
   const tokens = [field.name + ':'];
@@ -129,28 +129,16 @@ const transformType = (model: DMMF.Model, models?: DMMF.Model[]) => {
   };
 };
 
-export const transformEnum = (enm: DMMF.DatamodelEnum) => {
-  const values = enm.values
-    .map((v) => `${v.name}: Type.Literal('${v.name}'),\n`)
-    .join('');
-
-  return [
-    `export const ${enm.name}Const = {`,
-    values,
-    '}\n',
-    `export const ${enm.name} = Type.KeyOf(Type.Object(${enm.name}Const))\n`,
-    `export type ${enm.name}Type = Static<typeof ${enm.name}>`,
-  ].join('\n');
-};
-
 export function transformDMMF(dmmf: DMMF.Document) {
   let { models = [], enums = [], types = [] } = dmmf.datamodel;
 
-  const importStatements = new Set([
-    'import {Type, Static} from "@sinclair/typebox"',
-  ]);
+  const transformedEnums = transformEnums(enums);
 
   const transformedTypes = types.map((type) => {
+    const importStatements = new Set([
+      'import {Type, Static} from "@sinclair/typebox"',
+    ]);
+
     let { raw, inputRaw, deps } = transformType(type);
 
     deps.forEach((dep) => {
@@ -192,9 +180,11 @@ export function transformDMMF(dmmf: DMMF.Document) {
   });
 
   const transformedModels = models.map((model) => {
-    let { raw, inputRaw, deps } = transformModel(model);
+    const importStatements = new Set([
+      'import {Type, Static} from "@sinclair/typebox"',
+    ]);
 
-    log({ model, raw, inputRaw, deps });
+    let { raw, inputRaw, deps } = transformModel(model);
 
     deps.forEach((dep) => {
       const depsModel = models.find((m) => m.name === dep);
@@ -253,12 +243,5 @@ export function transformDMMF(dmmf: DMMF.Document) {
     };
   });
 
-  const transformedEnums = enums.map((enm) => ({
-    name: enm.name,
-    inputRawString: null,
-    rawString:
-      'import {Type, Static} from "@sinclair/typebox"\n\n' + transformEnum(enm),
-  }));
-
-  return [...transformedTypes, ...transformedModels, ...transformedEnums];
+  return [...transformedEnums, ...transformedTypes, ...transformedModels];
 }
