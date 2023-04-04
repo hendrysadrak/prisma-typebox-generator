@@ -36,22 +36,32 @@ generatorHandler({
         : // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           parseEnvValue(options.generator.output);
 
-    try {
-      await mkdir(outputDir, {
-        recursive: true,
-      });
-      const barrelFile = path.join(outputDir, 'index.ts');
-      await writeFile(barrelFile, '', {
-        encoding: 'utf-8',
-      });
-      await Promise.all(
-        payload.map((n) => {
-          const fsPromises = [];
+    const barrelFile = path.join(outputDir, 'index.ts');
 
+    await mkdir(outputDir, { recursive: true });
+    await writeFile(barrelFile, '', { encoding: 'utf-8' });
+
+    await Promise.all(
+      payload.map((n) => {
+        const fsPromises = [];
+
+        fsPromises.push(
+          writeFile(path.join(outputDir, n.name + '.ts'), format(n.rawString), {
+            encoding: 'utf-8',
+          }),
+        );
+
+        fsPromises.push(
+          appendFile(barrelFile, `export * from './${n.name}';\n`, {
+            encoding: 'utf-8',
+          }),
+        );
+
+        if (n.inputRawString) {
           fsPromises.push(
             writeFile(
-              path.join(outputDir, n.name + '.ts'),
-              format(n.rawString),
+              path.join(outputDir, n.name + 'Input.ts'),
+              format(n.inputRawString),
               {
                 encoding: 'utf-8',
               },
@@ -59,37 +69,14 @@ generatorHandler({
           );
 
           fsPromises.push(
-            appendFile(barrelFile, `export * from './${n.name}';\n`, {
+            appendFile(barrelFile, `export * from './${n.name}Input';\n`, {
               encoding: 'utf-8',
             }),
           );
+        }
 
-          if (n.inputRawString) {
-            fsPromises.push(
-              writeFile(
-                path.join(outputDir, n.name + 'Input.ts'),
-                format(n.inputRawString),
-                {
-                  encoding: 'utf-8',
-                },
-              ),
-            );
-
-            fsPromises.push(
-              appendFile(barrelFile, `export * from './${n.name}Input';\n`, {
-                encoding: 'utf-8',
-              }),
-            );
-          }
-
-          return Promise.all(fsPromises);
-        }),
-      );
-    } catch (e) {
-      console.error(
-        'Error: unable to write files for Prisma Typebox Generator',
-      );
-      throw e;
-    }
+        return Promise.all(fsPromises);
+      }),
+    );
   },
 });
