@@ -1,4 +1,5 @@
 import type { DMMF } from '@prisma/generator-helper';
+import { log } from 'console';
 
 const transformField = (field: DMMF.Field) => {
   const tokens = [field.name + ':'];
@@ -80,14 +81,13 @@ const transformModel = (model: DMMF.Model, models?: DMMF.Model[]) => {
     '})',
   ].join('\n');
 
-  if (Array.isArray(models)) {
+  if (Array.isArray(models))
     models.forEach((md) => {
       const re = new RegExp(`.+::${md.name}.+\n`, 'gm');
       const inputRe = new RegExp(`.+::${md.name}.+\n`, 'gm');
       raw = raw.replace(re, '');
       inputRaw = inputRaw.replace(inputRe, '');
     });
-  }
 
   return {
     raw,
@@ -111,14 +111,13 @@ const transformType = (model: DMMF.Model, models?: DMMF.Model[]) => {
     '})',
   ].join('\n');
 
-  if (Array.isArray(models)) {
+  if (Array.isArray(models))
     models.forEach((md) => {
       const re = new RegExp(`.+::${md.name}.+\n`, 'gm');
       const inputRe = new RegExp(`.+::${md.name}.+\n`, 'gm');
       raw = raw.replace(re, '');
       inputRaw = inputRaw.replace(inputRe, '');
     });
-  }
 
   return {
     raw,
@@ -144,14 +143,12 @@ export const transformEnum = (enm: DMMF.DatamodelEnum) => {
 export function transformDMMF(dmmf: DMMF.Document) {
   let { models = [], enums = [], types = [] } = dmmf.datamodel;
 
-  models = [...models, ...types];
-
   const importStatements = new Set([
     'import {Type, Static} from "@sinclair/typebox"',
   ]);
 
-  const transformedModels = models.map((model) => {
-    let { raw, inputRaw, deps } = transformModel(model);
+  const transformedTypes = types.map((type) => {
+    let { raw, inputRaw, deps } = transformType(type);
 
     deps.forEach((dep) => {
       const depsModel = models.find((m) => m.name === dep);
@@ -162,6 +159,61 @@ export function transformDMMF(dmmf: DMMF.Document) {
       const re = new RegExp(`::${dep}::`, 'gm');
       raw = raw.replace(re, replacer.raw);
       inputRaw = inputRaw.replace(re, replacer.inputRaw);
+    });
+
+    enums.forEach((enm) => {
+      const re = new RegExp(`::${enm.name}::`, 'gm');
+
+      if (!raw.match(re)) return;
+
+      raw = raw.replace(re, enm.name);
+      inputRaw = inputRaw.replace(re, enm.name);
+      importStatements.add(`import { ${enm.name} } from './${enm.name}'`);
+    });
+
+    return {
+      name: type.name,
+
+      rawString: [
+        [...importStatements].join('\n'),
+        raw,
+        `export type ${type.name}Type = Static<typeof ${type.name}>`,
+      ].join('\n\n'),
+
+      inputRawString: [
+        [...importStatements].join('\n'),
+        inputRaw,
+        `export type ${type.name}InputType = Static<typeof ${type.name}Input>`,
+      ].join('\n\n'),
+    };
+  });
+
+  const transformedModels = models.map((model) => {
+    let { raw, inputRaw, deps } = transformModel(model);
+
+    log({ model, raw, inputRaw, deps });
+
+    deps.forEach((dep) => {
+      const depsModel = models.find((m) => m.name === dep);
+
+      if (depsModel) {
+        const replacer = transformModel(depsModel, models);
+        const re = new RegExp(`::${dep}::`, 'gm');
+        raw = raw.replace(re, replacer.raw);
+        inputRaw = inputRaw.replace(re, replacer.inputRaw);
+      }
+
+      const depsType = types.find((m) => m.name === dep);
+
+      if (depsType) {
+        const replacer = transformType(depsType, types);
+        const re = new RegExp(`::${dep}::`, 'gm');
+        raw = raw.replace(re, depsType.name);
+        inputRaw = inputRaw.replace(re, depsType.name);
+        importStatements.add(
+          `import { ${depsType.name} } from './${depsType.name}'`,
+        );
+      }
     });
 
     enums.forEach((enm) => {
@@ -198,5 +250,5 @@ export function transformDMMF(dmmf: DMMF.Document) {
       'import {Type, Static} from "@sinclair/typebox"\n\n' + transformEnum(enm),
   }));
 
-  return [...transformedModels, ...transformedEnums];
+  return [...transformedTypes, ...transformedModels, ...transformedEnums];
 }
