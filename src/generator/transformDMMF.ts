@@ -5,7 +5,7 @@ import { lines } from './utils';
 const transformField = (field: DMMF.Field) => {
   const tokens = [field.name + ':'];
   let inputTokens = [];
-  const deps = new Set();
+  const deps = new Set<string>();
 
   if (['Int', 'Float', 'Decimal'].includes(field.type)) {
     tokens.push('Type.Number()');
@@ -48,7 +48,8 @@ const transformField = (field: DMMF.Field) => {
 };
 
 const transformFields = (fields: DMMF.Field[]) => {
-  let dependencies = new Set();
+  const dependencies = new Set<string>();
+
   const _fields: string[] = [];
   const _inputFields: string[] = [];
 
