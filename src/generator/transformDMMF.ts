@@ -51,13 +51,16 @@ const transformFields = (fields: DMMF.Field[]) => {
   const _fields: string[] = [];
   const _inputFields: string[] = [];
 
-  fields.map(transformField).forEach((field) => {
-    _fields.push(field.str);
-    _inputFields.push(field.strInput);
-    [...field.deps].forEach((d) => {
-      dependencies.add(d);
+  fields
+    .filter((field) => !field.relationName)
+    .map(transformField)
+    .forEach((field) => {
+      _fields.push(field.str);
+      _inputFields.push(field.strInput);
+      [...field.deps].forEach((d) => {
+        dependencies.add(d);
+      });
     });
-  });
 
   return {
     dependencies,
@@ -196,17 +199,24 @@ export function transformDMMF(dmmf: DMMF.Document) {
     deps.forEach((dep) => {
       const depsModel = models.find((m) => m.name === dep);
 
-      if (depsModel) {
+      if (depsModel && depsModel.name !== model.name) {
         const replacer = transformModel(depsModel, models);
         const re = new RegExp(`::${dep}::`, 'gm');
+
         raw = raw.replace(re, replacer.raw);
         inputRaw = inputRaw.replace(re, replacer.inputRaw);
+
+        // raw = raw.replace(re, depsModel.name);
+        // inputRaw = inputRaw.replace(re, depsModel.name);
+        // importStatements.add(
+        //   `import { ${depsModel.name} } from './${depsModel.name}'`,
+        // );
       }
 
       const depsType = types.find((m) => m.name === dep);
 
-      if (depsType) {
-        const replacer = transformType(depsType, types);
+      if (depsType && depsType.name !== model.name) {
+        // const replacer = transformType(depsType, types);
         const re = new RegExp(`::${dep}::`, 'gm');
         raw = raw.replace(re, depsType.name);
         inputRaw = inputRaw.replace(re, depsType.name);

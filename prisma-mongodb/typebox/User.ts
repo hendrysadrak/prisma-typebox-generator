@@ -12,12 +12,6 @@ export const User = Type.Object({
   name: Type.Optional(Type.String()),
   successorId: Type.Optional(Type.Number()),
   role: Type.Optional(Role),
-  posts: Type.Array(
-    Type.Object({
-      id: Type.String(),
-      userId: Type.Optional(Type.String()),
-    })
-  ),
   keywords: Type.Array(Type.String()),
   biography: Type.String(),
   biginteger: Type.Integer(),

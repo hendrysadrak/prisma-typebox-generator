@@ -60,6 +60,7 @@
     "typescript": "^5.0.3"
   },
   "scripts": {
+    "generate": "yarn generate-mongodb && yarn generate-postgresql",
     "generate-mongodb": "prisma generate --schema=./prisma-mongodb/schema.prisma",
     "generate-postgresql": "prisma generate --schema=./prisma-postgresql/schema.prisma",
     "clean": "rm -rf dist",

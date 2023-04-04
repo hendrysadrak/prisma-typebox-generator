@@ -10,12 +10,6 @@ export const UserInput = Type.Object({
   name: Type.Optional(Type.String()),
   successorId: Type.Optional(Type.Number()),
   role: Type.Optional(Role),
-  posts: Type.Array(
-    Type.Object({
-      id: Type.Optional(Type.Number()),
-      userId: Type.Optional(Type.Number()),
-    })
-  ),
   keywords: Type.Array(Type.String()),
   biography: Type.String(),
   decimal: Type.Number(),
