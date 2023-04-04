@@ -67,11 +67,44 @@ const transformFields = (fields: DMMF.Field[]) => {
 
 const transformModel = (model: DMMF.Model, models?: DMMF.Model[]) => {
   const fields = transformFields(model.fields);
+
   let raw = [
     `${models ? '' : `export const ${model.name} = `}Type.Object({\n\t`,
     fields.rawString,
     '})',
   ].join('\n');
+
+  let inputRaw = [
+    `${models ? '' : `export const ${model.name}Input = `}Type.Object({\n\t`,
+    fields.rawInputString,
+    '})',
+  ].join('\n');
+
+  if (Array.isArray(models)) {
+    models.forEach((md) => {
+      const re = new RegExp(`.+::${md.name}.+\n`, 'gm');
+      const inputRe = new RegExp(`.+::${md.name}.+\n`, 'gm');
+      raw = raw.replace(re, '');
+      inputRaw = inputRaw.replace(inputRe, '');
+    });
+  }
+
+  return {
+    raw,
+    inputRaw,
+    deps: fields.dependencies,
+  };
+};
+
+const transformType = (model: DMMF.Model, models?: DMMF.Model[]) => {
+  const fields = transformFields(model.fields);
+
+  let raw = [
+    `${models ? '' : `export const ${model.name} = `}Type.Object({\n\t`,
+    fields.rawString,
+    '})',
+  ].join('\n');
+
   let inputRaw = [
     `${models ? '' : `export const ${model.name}Input = `}Type.Object({\n\t`,
     fields.rawInputString,
@@ -109,56 +142,61 @@ export const transformEnum = (enm: DMMF.DatamodelEnum) => {
 };
 
 export function transformDMMF(dmmf: DMMF.Document) {
-  const { models, enums } = dmmf.datamodel;
+  let { models = [], enums = [], types = [] } = dmmf.datamodel;
+
+  models = [...models, ...types];
+
   const importStatements = new Set([
     'import {Type, Static} from "@sinclair/typebox"',
   ]);
 
-  return [
-    ...models.map((model) => {
-      let { raw, inputRaw, deps } = transformModel(model);
+  const transformedModels = models.map((model) => {
+    let { raw, inputRaw, deps } = transformModel(model);
 
-      [...deps].forEach((d) => {
-        const depsModel = models.find((m) => m.name === d) as DMMF.Model;
-        if (depsModel) {
-          const replacer = transformModel(depsModel, models);
-          const re = new RegExp(`::${d}::`, 'gm');
-          raw = raw.replace(re, replacer.raw);
-          inputRaw = inputRaw.replace(re, replacer.inputRaw);
-        }
-      });
+    deps.forEach((dep) => {
+      const depsModel = models.find((m) => m.name === dep);
 
-      enums.forEach((enm) => {
-        const re = new RegExp(`::${enm.name}::`, 'gm');
-        if (raw.match(re)) {
-          raw = raw.replace(re, enm.name);
-          inputRaw = inputRaw.replace(re, enm.name);
-          importStatements.add(`import { ${enm.name} } from './${enm.name}'`);
-        }
-      });
+      if (!depsModel) return;
 
-      return {
-        name: model.name,
-        rawString: [
-          [...importStatements].join('\n'),
-          raw,
-          `export type ${model.name}Type = Static<typeof ${model.name}>`,
-        ].join('\n\n'),
-        inputRawString: [
-          [...importStatements].join('\n'),
-          inputRaw,
-          `export type ${model.name}InputType = Static<typeof ${model.name}Input>`,
-        ].join('\n\n'),
-      };
-    }),
-    ...enums.map((enm) => {
-      return {
-        name: enm.name,
-        inputRawString: null,
-        rawString:
-          'import {Type, Static} from "@sinclair/typebox"\n\n' +
-          transformEnum(enm),
-      };
-    }),
-  ];
+      const replacer = transformModel(depsModel, models);
+      const re = new RegExp(`::${dep}::`, 'gm');
+      raw = raw.replace(re, replacer.raw);
+      inputRaw = inputRaw.replace(re, replacer.inputRaw);
+    });
+
+    enums.forEach((enm) => {
+      const re = new RegExp(`::${enm.name}::`, 'gm');
+
+      if (!raw.match(re)) return;
+
+      raw = raw.replace(re, enm.name);
+      inputRaw = inputRaw.replace(re, enm.name);
+      importStatements.add(`import { ${enm.name} } from './${enm.name}'`);
+    });
+
+    return {
+      name: model.name,
+
+      rawString: [
+        [...importStatements].join('\n'),
+        raw,
+        `export type ${model.name}Type = Static<typeof ${model.name}>`,
+      ].join('\n\n'),
+
+      inputRawString: [
+        [...importStatements].join('\n'),
+        inputRaw,
+        `export type ${model.name}InputType = Static<typeof ${model.name}Input>`,
+      ].join('\n\n'),
+    };
+  });
+
+  const transformedEnums = enums.map((enm) => ({
+    name: enm.name,
+    inputRawString: null,
+    rawString:
+      'import {Type, Static} from "@sinclair/typebox"\n\n' + transformEnum(enm),
+  }));
+
+  return [...transformedModels, ...transformedEnums];
 }
