@@ -3,7 +3,7 @@ import { parseEnvValue } from '@prisma/sdk';
 import { error } from 'console';
 import { appendFile, mkdir, writeFile } from 'fs/promises';
 import pMap from 'p-map';
-import * as path from 'path';
+import { join } from 'path';
 import { format as prettier } from 'prettier';
 import { transformDMMF } from './generator/transformDMMF';
 
@@ -37,18 +37,16 @@ generatorHandler({
         : // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           parseEnvValue(options.generator.output);
 
-    const barrelFile = path.join(outputDir, 'index.ts');
+    const barrelFile = join(outputDir, 'index.ts');
 
     await mkdir(outputDir, { recursive: true });
     await writeFile(barrelFile, '', { encoding: 'utf-8' });
     await pMap(
       payload,
       async (n) => {
-        await writeFile(
-          path.join(outputDir, n.name + '.ts'),
-          format(n.rawString),
-          { encoding: 'utf-8' },
-        );
+        await writeFile(join(outputDir, n.name + '.ts'), format(n.rawString), {
+          encoding: 'utf-8',
+        });
 
         await appendFile(barrelFile, `export * from './${n.name}';\n`, {
           encoding: 'utf-8',
@@ -56,7 +54,7 @@ generatorHandler({
 
         if (n.inputRawString) {
           await writeFile(
-            path.join(outputDir, n.name + 'Input.ts'),
+            join(outputDir, n.name + 'Input.ts'),
             format(n.inputRawString),
             { encoding: 'utf-8' },
           );
