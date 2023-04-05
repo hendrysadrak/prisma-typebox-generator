@@ -1,5 +1,5 @@
 import { generatorHandler } from '@prisma/generator-helper';
-import { parseEnvValue } from '@prisma/sdk';
+import { parseEnvValue } from '@prisma/internals';
 import { error } from 'console';
 import { appendFile, mkdir, writeFile } from 'fs/promises';
 import pMap from 'p-map';
